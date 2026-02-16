@@ -6,6 +6,9 @@ import { Button } from "@/components/ui/button"
 import { useAuth } from "@/components/auth-provider"
 import { useCart } from "@/components/cart-context"
 import { Menu, X } from "lucide-react"
+import { Badge } from "./ui/badge"
+import { Avatar, AvatarFallback } from "./ui/avatar"
+import { AvatarImage } from "@radix-ui/react-avatar"
 
 export function Navbar() {
   const { user, logout } = useAuth()
@@ -73,9 +76,29 @@ export function Navbar() {
             <div className="hidden items-center gap-2 sm:flex">
               {user ? (
                 <>
-                  <span className="text-xs sm:text-sm text-muted-foreground truncate max-w-[100px] sm:max-w-none">
-                    {user.name}
-                  </span>
+
+                  <Badge
+                    variant="secondary"
+                    className="flex items-center gap-2 rounded-lg bg-blue-50 px-3 py-1.5 text-blue-700
+             dark:bg-blue-900/40 dark:text-blue-200"
+                  >
+                    <Avatar className="h-7 w-7 rounded-md border border-blue-200 dark:border-blue-700">
+                      <AvatarImage
+                        src="/avatar.jpg"
+                        alt={user.name}
+                        className="object-cover"
+                      />
+                      <AvatarFallback className="text-xs font-medium">
+                        {user.name?.charAt(0)}
+                      </AvatarFallback>
+                    </Avatar>
+
+                    <span className="text-sm font-medium truncate max-w-[120px]">
+                      {user.name}
+                    </span>
+                  </Badge>
+
+
                   <Button size="sm" variant="ghost" onClick={logout}>
                     Logout
                   </Button>
@@ -147,7 +170,26 @@ export function Navbar() {
               <div className="border-t border-border pt-3 mt-3 space-y-2">
                 {user ? (
                   <>
-                    <div className="px-3 py-2 text-sm font-medium text-foreground">{user.name}</div>
+                    <Badge
+                      variant="secondary"
+                      className="flex items-center gap-2 rounded-lg bg-blue-50 px-3 py-1.5 text-blue-700
+             dark:bg-blue-900/40 dark:text-blue-200"
+                    >
+                      <Avatar className="h-7 w-7 rounded-md border border-blue-200 dark:border-blue-700">
+                        <AvatarImage
+                          src="/avatar.jpg"
+                          alt={user.name}
+                          className="object-cover"
+                        />
+                        <AvatarFallback className="text-xs font-medium">
+                          {user.name?.charAt(0)}
+                        </AvatarFallback>
+                      </Avatar>
+
+                      <span className="text-sm font-medium truncate max-w-[120px]">
+                        {user.name}
+                      </span>
+                    </Badge>
                     <button
                       onClick={() => {
                         logout()

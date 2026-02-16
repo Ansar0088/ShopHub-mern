@@ -198,18 +198,7 @@ db.users.updateOne(
 }
 ```
 
-## Deployment
 
-### Deploy to Vercel
-
-1. Push your code to GitHub
-2. Import project in Vercel
-3. Add environment variables in Vercel dashboard
-4. Deploy
-
-```bash
-vercel deploy
-```
 
 ## Security Best Practices
 

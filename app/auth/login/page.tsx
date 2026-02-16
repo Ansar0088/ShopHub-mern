@@ -1,21 +1,21 @@
 "use client"
 
 import type React from "react"
-
 import { useState } from "react"
 import { useRouter } from "next/navigation"
 import Link from "next/link"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { useAuth } from "@/components/auth-provider"
-import { LogIn } from "lucide-react"
+import { ArrowLeft, ShoppingBag, Eye, EyeOff, Loader2 } from "lucide-react"
+import { Badge } from "@/components/ui/badge"
 
 export default function LoginPage() {
   const router = useRouter()
   const { login } = useAuth()
   const [formData, setFormData] = useState({ email: "", password: "" })
+  const [showPassword, setShowPassword] = useState(false)
   const [error, setError] = useState("")
   const [isLoading, setIsLoading] = useState(false)
 
@@ -33,96 +33,151 @@ export default function LoginPage() {
       await login(formData.email, formData.password)
       router.push("/")
     } catch (err) {
-      setError((err as Error).message || "Login failed")
+      setError((err as Error).message || "Invalid credentials. Please try again.")
     } finally {
       setIsLoading(false)
     }
   }
 
   return (
-    <div className="flex min-h-screen flex-col items-center justify-center bg-gradient-to-br from-primary/5 via-background to-accent/5 px-4 py-8 sm:py-12">
-      <div className="mb-8 text-center">
-        <h1 className="text-2xl sm:text-3xl font-bold text-primary mb-2">ShopHub</h1>
-        <p className="text-sm text-muted-foreground">Welcome back to your shopping hub</p>
+    <div className="flex min-h-screen bg-[#FDFDFD] selection:bg-black selection:text-white">
+      {/* MOBILE BACK BUTTON */}
+      <div className="absolute top-6 left-6 z-20">
+        <Link href="/">
+          <Button variant="ghost" size="sm" className="group text-slate-500 hover:text-black rounded-full">
+            <ArrowLeft className="mr-2 h-4 w-4 group-hover:-translate-x-1 transition-transform" />
+            <span className="text-xs font-bold uppercase tracking-widest">Store</span>
+          </Button>
+        </Link>
       </div>
 
-      <Card className="w-full max-w-md">
-        <CardHeader className="pb-4">
-          <div className="flex items-center justify-center mb-2">
-            <LogIn className="h-6 w-6 text-primary" />
+      <div className="flex w-full items-center justify-center p-6 lg:p-12">
+        <div className="w-full max-w-[400px] space-y-8">
+          {/* BRANDING */}
+          <div className="flex flex-col items-center text-center">
+            <div className="mb-4 flex h-12 w-12 items-center justify-center rounded-2xl bg-black text-white shadow-xl shadow-slate-200">
+              <ShoppingBag size={24} />
+            </div>
+            <h1 className="text-3xl font-black tracking-tighter text-slate-900 sm:text-4xl">
+              Welcome back.
+            </h1>
+            <p className="mt-2 text-sm font-medium text-slate-400">
+              Please enter your details to sign in.
+            </p>
           </div>
-          <CardTitle className="text-xl sm:text-2xl text-center">Login</CardTitle>
-          <CardDescription className="text-center text-xs sm:text-sm">Sign in to your ShopHub account</CardDescription>
-        </CardHeader>
-        <CardContent>
-          <form onSubmit={handleSubmit} className="space-y-4">
+
+          {/* FORM */}
+          <form onSubmit={handleSubmit} className="space-y-5">
             {error && (
-              <div className="rounded-lg border border-destructive/30 bg-destructive/10 p-3 text-xs sm:text-sm text-destructive">
+              <div className="animate-in fade-in slide-in-from-top-2 rounded-xl bg-red-50 p-4 text-xs font-semibold text-red-600 border border-red-100">
                 {error}
               </div>
             )}
 
-            <div className="space-y-2">
-              <Label htmlFor="email" className="text-xs sm:text-sm font-medium">
+            <div className="space-y-1.5">
+              <Label htmlFor="email" className="text-[11px] font-bold uppercase tracking-widest text-slate-400 ml-1">
                 Email Address
               </Label>
               <Input
                 id="email"
                 name="email"
                 type="email"
+                autoComplete="email"
                 value={formData.email}
                 onChange={handleInputChange}
                 required
-                placeholder="your@email.com"
-                className="text-sm"
+                placeholder="name@example.com"
+                className="h-12 rounded-xl border-slate-200 bg-white px-4 text-sm transition-all focus:ring-2 focus:ring-black focus:border-transparent"
               />
             </div>
 
-            <div className="space-y-2">
-              <Label htmlFor="password" className="text-xs sm:text-sm font-medium">
-                Password
-              </Label>
-              <Input
-                id="password"
-                name="password"
-                type="password"
-                value={formData.password}
-                onChange={handleInputChange}
-                required
-                placeholder="••••••••"
-                className="text-sm"
-              />
+            <div className="space-y-1.5">
+              <div className="flex items-center justify-between ml-1">
+                <Label htmlFor="password" className="text-[11px] font-bold uppercase tracking-widest text-slate-400">
+                  Password
+                </Label>
+                <Link href="#" className="text-[11px] font-bold text-blue-600 hover:underline underline-offset-4">
+                  Forgot?
+                </Link>
+              </div>
+              <div className="relative">
+                <Input
+                  id="password"
+                  name="password"
+                  type={showPassword ? "text" : "password"}
+                  value={formData.password}
+                  onChange={handleInputChange}
+                  required
+                  placeholder="••••••••"
+                  className="h-12 rounded-xl border-slate-200 bg-white px-4 pr-12 text-sm transition-all focus:ring-2 focus:ring-black focus:border-transparent"
+                />
+                <button
+                  type="button"
+                  onClick={() => setShowPassword(!showPassword)}
+                  className="absolute right-4 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-900"
+                >
+                  {showPassword ? <EyeOff size={18} /> : <Eye size={18} />}
+                </button>
+              </div>
             </div>
 
-            <Button type="submit" className="w-full text-sm sm:text-base" disabled={isLoading}>
-              {isLoading ? "Logging in..." : "Login"}
+            <Button 
+              type="submit" 
+              className="h-12 w-full rounded-xl bg-black text-sm font-bold text-white transition-all hover:bg-zinc-800 active:scale-[0.98]" 
+              disabled={isLoading}
+            >
+              {isLoading ? (
+                <span className="flex items-center gap-2">
+                  <Loader2 className="h-4 w-4 animate-spin" /> Verifying...
+                </span>
+              ) : (
+                "Sign In"
+              )}
             </Button>
           </form>
 
-          <div className="mt-6 space-y-4">
-            <div className="relative">
-              <div className="absolute inset-0 flex items-center">
-                <div className="w-full border-t border-border" />
-              </div>
-              <div className="relative flex justify-center text-xs">
-                <span className="bg-card px-2 text-muted-foreground">New to ShopHub?</span>
-              </div>
-            </div>
-
-            <Link href="/auth/register">
-              <Button variant="outline" className="w-full text-xs sm:text-sm bg-transparent">
-                Create Account
-              </Button>
-            </Link>
+          {/* REGISTER LINK */}
+          <div className="text-center">
+            <p className="text-sm font-medium text-slate-400">
+              Don't have an account?{" "}
+              <Link 
+                href="/auth/register" 
+                className="text-black font-bold hover:underline underline-offset-4"
+              >
+                Sign up for free
+              </Link>
+            </p>
           </div>
+        </div>
+      </div>
 
-          <p className="mt-4 text-center text-xs sm:text-sm text-muted-foreground">
-            <Link href="/" className="text-primary hover:text-primary/80 transition-colors font-medium">
-              Back to Shopping
-            </Link>
+      {/* VISUAL SIDEBAR (Hidden on Mobile) */}
+      <div className="relative hidden w-1/2 bg-slate-900 lg:block overflow-hidden">
+        <div className="absolute inset-0 bg-gradient-to-br from-blue-600/20 to-transparent" />
+        <div className="absolute inset-0 bg-[url('https://www.transparenttextures.com/patterns/cubes.png')] opacity-20" />
+        
+        <div className="relative z-10 flex h-full flex-col items-start justify-end p-16 text-white">
+          <Badge className="mb-6 bg-white/10 text-white border-none px-4 py-1 backdrop-blur-md">
+            The Hub Experience
+          </Badge>
+          <h2 className="max-w-md text-4xl font-bold leading-tight tracking-tighter">
+            Join the most exclusive <br/>shopping community.
+          </h2>
+          <p className="mt-4 max-w-sm text-lg text-slate-400">
+            Get early access to drops, member-only pricing, and personalized recommendations.
           </p>
-        </CardContent>
-      </Card>
+          <div className="mt-12 flex gap-8">
+            <div className="flex flex-col">
+              <span className="text-2xl font-bold italic">24h</span>
+              <span className="text-xs font-bold uppercase tracking-widest text-slate-500">Support</span>
+            </div>
+            <div className="flex flex-col">
+              <span className="text-2xl font-bold italic">100%</span>
+              <span className="text-xs font-bold uppercase tracking-widest text-slate-500">Secure</span>
+            </div>
+          </div>
+        </div>
+      </div>
     </div>
   )
 }

@@ -1,8 +1,9 @@
 import { type NextRequest, NextResponse } from "next/server"
+import { ObjectId } from "mongodb"
 import { verifyToken } from "@/lib/auth"
 import connectToDatabase from "@/lib/db"
-import type { User } from "@/lib/models"
 import { successResponse, errorResponse } from "@/lib/api-response"
+import { User } from "@/lib/models"
 
 export async function POST(request: NextRequest) {
   try {
@@ -18,9 +19,8 @@ export async function POST(request: NextRequest) {
       return NextResponse.json(errorResponse("Invalid token"), { status: 401 })
     }
 
-    // Fetch user from database
     const { db } = await connectToDatabase()
-    const user = await db.collection<User>("users").findOne({ _id: decoded.userId })
+    const user = await db.collection<User>("users").findOne({ _id: new ObjectId(decoded.userId) })
 
     if (!user) {
       return NextResponse.json(errorResponse("User not found"), { status: 404 })

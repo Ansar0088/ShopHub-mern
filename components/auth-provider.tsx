@@ -28,26 +28,19 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [isLoading, setIsLoading] = useState(true)
 
   // Load token from localStorage on mount
-  useEffect(() => {
-    const savedToken = localStorage.getItem("authToken")
-    if (savedToken) {
-      setToken(savedToken)
-      verifyAuth(savedToken)
-    } else {
-      setIsLoading(false)
-    }
-  }, [])
+
 
   const verifyAuth = useCallback(
     async (authToken?: string) => {
       const tokenToUse = authToken || token
-      if (!tokenToUse) {
-        setIsLoading(false)
-        return
-      }
+      // if (!tokenToUse) {
+      //   setIsLoading(false)
+      //   return
+      // }
 
       try {
         const response = await fetch("/api/auth/verify", {
+          method: "POST",
           headers: {
             Authorization: `Bearer ${tokenToUse}`,
           },
@@ -56,6 +49,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         if (response.ok) {
           const data = await response.json()
           setUser(data.data.user)
+          return data
         } else {
           localStorage.removeItem("authToken")
           setToken(null)
@@ -69,7 +63,15 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     },
     [token],
   )
-
+  useEffect(() => {
+    const savedToken = localStorage.getItem("authToken")
+    if (savedToken) {
+      setToken(savedToken)
+      verifyAuth(savedToken)
+    } else {
+      setIsLoading(false)
+    }
+  }, [])
   const login = useCallback(async (email: string, password: string) => {
     const response = await fetch("/api/auth/login", {
       method: "POST",
@@ -121,8 +123,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
 export function useAuth() {
   const context = useContext(AuthContext)
+
   if (!context) {
     throw new Error("useAuth must be used within AuthProvider")
   }
+
   return context
 }
+

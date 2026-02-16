@@ -40,7 +40,6 @@ export interface Product {
   images: string[]
   rating: number
   reviews: number
-  sku: string
   specifications?: Record<string, string>
   createdAt: Date
   updatedAt: Date
