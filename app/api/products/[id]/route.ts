@@ -1,86 +1,109 @@
-import { type NextRequest, NextResponse } from "next/server";
-import connectToDatabase from "@/lib/db";
-import type { Product } from "@/lib/models";
-import { successResponse, errorResponse } from "@/lib/api-response";
-import { ObjectId } from "mongodb";
+import { type NextRequest, NextResponse } from "next/server"
+import connectToDatabase from "@/lib/db"
+import type { Product } from "@/lib/models"
+import { successResponse, errorResponse } from "@/lib/api-response"
+import { ObjectId } from "mongodb"
 
 export async function GET(
   request: NextRequest,
-  { params }: { params: Promise<{ id: string }> },
+  { params }: { params: { id: string } }
 ) {
   try {
-    const { id } = await params;
-    const { db } = await connectToDatabase();
+    const id = params.id
+
+    if (!ObjectId.isValid(id)) {
+      return NextResponse.json(errorResponse("Invalid ID"), { status: 400 })
+    }
+
+    const { db } = await connectToDatabase()
 
     const product = await db.collection<Product>("products").findOne({
       _id: new ObjectId(id),
-    });
+    })
 
     if (!product) {
       return NextResponse.json(errorResponse("Product not found"), {
         status: 404,
-      });
+      })
     }
 
-    return NextResponse.json(successResponse(product));
+    return NextResponse.json(successResponse(product))
   } catch (error) {
-    console.error("[Product GET Error]", error);
+    console.error("[Product GET Error]", error)
     return NextResponse.json(errorResponse("Failed to fetch product"), {
       status: 500,
-    });
+    })
   }
 }
 
+
 export async function PUT(
   request: NextRequest,
-  { params }: { params: { id: string } },
+  { params }: { params: Promise<{ id: string }> } // Params is now a Promise
 ) {
   try {
+   
     const token = request.headers.get("authorization")?.split(" ")[1];
     if (!token) {
-      return NextResponse.json({ success: false, message: "Unauthorized" }, { status: 401 });
+      return NextResponse.json(
+        { success: false, message: "Unauthorized" }, 
+        { status: 401 }
+      );
     }
 
-    const { id: rawId } = await params;
-    const id = rawId.trim();
+   
+    const { id } = await params;
+    console.log("Processing update for ID:", id);
 
-    if (!ObjectId.isValid(id)) {
-      return NextResponse.json({ success: false, message: "Invalid ID format" }, { status: 400 });
+   
+    if (!id || !ObjectId.isValid(id)) {
+      return NextResponse.json(
+        { success: false, message: "Invalid ID format" }, 
+        { status: 400 }
+      );
     }
 
     const body = await request.json();
     const { db } = await connectToDatabase();
 
-    const result = await db.collection("products").findOneAndUpdate(
-      { _id: new ObjectId(id) },
-      { 
-        $set: { 
-          name: body.name,
-          description: body.description,
-          price: Number(body.price),
-          stock: Number(body.stock),
-          category: body.category,
-          // UPDATE: Wrap the image in an array to overwrite the existing "images" field
-          images: [body.image], 
-          updatedAt: new Date() 
-        } 
-      },
-      { returnDocument: "after" }
-    );
+    // 5. Prepare Update Data
+    const updateData: any = {
+      updatedAt: new Date(),
+    };
 
-    const updatedDoc = result.value || result;
-
-    if (!updatedDoc) {
-      return NextResponse.json({ success: false, message: "Product not found" }, { status: 404 });
+    if (body.name) updateData.name = body.name;
+    if (body.description) updateData.description = body.description;
+    if (body.price) updateData.price = Number(body.price);
+    if (body.stock) updateData.stock = Number(body.stock);
+    if (body.category) updateData.category = body.category;
+    
+    if (body.image) {
+      updateData.images = Array.isArray(body.image) ? body.image : [body.image];
     }
 
-    return NextResponse.json({
-      success: true,
-      message: "Product updated successfully",
-      data: { product: updatedDoc },
+    const result = await db.collection("products").findOneAndUpdate(
+      { _id: new ObjectId(id) },
+      { $set: updateData },
+      { returnDocument: "after" } 
+    );
+
+   
+    const updatedProduct = result?.value || result;
+
+    if (!updatedProduct) {
+      return NextResponse.json(
+        { success: false, message: "Product not found" }, 
+        { status: 404 }
+      );
+    }
+
+    return NextResponse.json({ 
+      success: true, 
+      message: "Product updated successfully", 
+      data: updatedProduct 
     });
 
-  } catch (error: any) {
+  } catch (error) {
     console.error("[Product PUT Error]", error);
     return NextResponse.json(
       { success: false, message: "Failed to update product" }, 
@@ -91,32 +114,43 @@ export async function PUT(
 
 export async function DELETE(
   request: NextRequest,
-  { params }: { params: Promise<{ id: string }> },
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
-    const token = request.headers.get("authorization")?.split(" ")[1];
+    const token = request.headers.get("authorization")?.split(" ")[1]
     if (!token) {
-      return NextResponse.json(errorResponse("Unauthorized"), { status: 401 });
+      return NextResponse.json(errorResponse("Unauthorized"), {
+        status: 401,
+      })
     }
 
-    const { id } = await params;
-    const { db } = await connectToDatabase();
+   const {id}= await params
+
+    if (!ObjectId.isValid(id)) {
+      return NextResponse.json(errorResponse("Invalid ID"), {
+        status: 400,
+      })
+    }
+
+    const { db } = await connectToDatabase()
 
     const result = await db.collection<Product>("products").deleteOne({
       _id: new ObjectId(id),
-    });
+    })
 
     if (result.deletedCount === 0) {
       return NextResponse.json(errorResponse("Product not found"), {
         status: 404,
-      });
+      })
     }
 
-    return NextResponse.json(successResponse({ message: "Product deleted" }));
+    return NextResponse.json(
+      successResponse({ message: "Product deleted successfully" })
+    )
   } catch (error) {
-    console.error("[Product DELETE Error]", error);
+    console.error("[Product DELETE Error]", error)
     return NextResponse.json(errorResponse("Failed to delete product"), {
       status: 500,
-    });
+    })
   }
 }

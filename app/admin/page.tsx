@@ -6,14 +6,15 @@ import { useRouter } from "next/navigation"
 import {
   Package,
   ShoppingCart,
-  Users,
   BarChart3,
   Plus,
   ChevronRight,
   LayoutDashboard,
-  Search,
   Bell,
   ArrowLeft,
+  Layers,
+  Globe,
+  ExternalLink,
 } from "lucide-react"
 
 import { Button } from "@/components/ui/button"
@@ -28,105 +29,108 @@ export default function AdminDashboard() {
   const [isLoading, setIsLoading] = useState(true)
   const [data, setData] = useState({
     totalProducts: 0,
-    totalOrders: 0,
+    totalCategories: 0,
     totalRevenue: 0,
-    totalCustomers: 0,
+    totalStock: 0,
   })
 
   useEffect(() => {
+    if (!token) return
+
     const fetchStats = async () => {
       try {
-        const response = await fetch("/api/products", {
+        const response = await fetch("/api/products?limit=1000", {
           headers: { Authorization: `Bearer ${token}` },
         })
 
-        if (response.ok) {
-          const result = await response.json()
-          setData({
-            totalProducts: result.data.total || 0,
-            totalOrders: 1332,
-            totalRevenue: result.data.products.reduce(
-              (acc: number, p: any) => acc + p.price,
-              0
-            ),
-            totalCustomers: 8,
-          })
-        }
+        if (!response.ok) throw new Error("Failed")
+
+        const result = await response.json()
+        const products = result.data?.products || []
+        const categoriesSet = new Set(products.map((p: any) => p.category))
+
+        setData({
+          totalProducts: result.data?.pagination?.total || products.length,
+          totalCategories: categoriesSet.size,
+          totalRevenue: products.reduce(
+            (acc: number, p: any) => acc + (p.discountPrice || p.price) * (p.stock || 1),
+            0
+          ),
+          totalStock: products.reduce((acc: number, p: any) => acc + (p.stock || 0), 0),
+        })
       } catch (error) {
         console.error("[Admin Stats Error]", error)
       } finally {
         setIsLoading(false)
       }
-    } 
+    }
 
     fetchStats()
   }, [token])
 
   const statsConfig = [
-    { title: "Inventory", value: data.totalProducts, icon: Package, color: "text-blue-600", bg: "bg-blue-50" },
-    
+    { title: "Products", value: data.totalProducts, icon: Package, color: "text-blue-600", bg: "bg-blue-50" },
+    { title: "Categories", value: data.totalCategories, icon: Layers, color: "text-purple-600", bg: "bg-purple-50" },
+    { title: "Stock", value: data.totalStock, icon: BarChart3, color: "text-green-600", bg: "bg-green-50" },
+    { title: "Revenue", value: `PKR ${data.totalRevenue.toLocaleString()}`, icon: ShoppingCart, color: "text-orange-600", bg: "bg-orange-50" },
   ]
 
   return (
-    <div className="min-h-screen bg-[#F9FAFB] pb-20 lg:pb-0">
-
-      {/* MOBILE HEADER */}
+    <div className="min-h-screen bg-[#F9FAFB] pb-24 lg:pb-10 relative">
+      {/* HEADER */}
       <header className="sticky top-0 z-40 flex h-16 items-center justify-between border-b bg-white/80 px-4 backdrop-blur-md lg:h-20 lg:px-8">
-        <div className="flex items-center gap-2">
-
-          {/* BACK TO HOME (MOBILE ONLY) */}
-          <Button
-            variant="ghost"
-            size="icon"
-            onClick={() => router.push("/")}
-            className="lg:hidden"
-          >
-            <ArrowLeft size={18} />
-          </Button>
-
-          <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-black text-white lg:h-10 lg:w-10">
-            <LayoutDashboard size={20} />
+        <div className="flex items-center gap-3">
+          <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-black text-white shadow-lg lg:h-11 lg:w-11">
+            <LayoutDashboard size={20} strokeWidth={2.5} />
           </div>
-
           <div>
-            <h1 className="text-sm font-bold text-slate-900 lg:text-xl">
-              Admin Panel
+            <h1 className="text-sm font-black uppercase tracking-tighter text-slate-900 lg:text-xl">
+              Panel<span className="text-slate-400">.</span>
             </h1>
-            <p className="hidden text-xs text-slate-500 lg:block">
-              Welcome back, {user?.name || "Manager"}
-            </p>
           </div>
         </div>
 
         <div className="flex items-center gap-2">
-          <Button variant="ghost" size="icon" className="rounded-full">
-            <Search size={18} />
+          {/* Desktop Version of Home Button */}
+          <Button 
+            variant="outline" 
+            size="sm" 
+            onClick={() => router.push("/")}
+            className="hidden sm:flex items-center gap-2 border-slate-200 hover:bg-black hover:text-white transition-all rounded-full px-4 h-8 text-[10px] font-bold uppercase tracking-widest"
+          >
+            <Globe size={14} />
+            Live Store
           </Button>
-          <Button variant="ghost" size="icon" className="rounded-full">
-            <Bell size={18} />
+          <Button variant="ghost" size="icon" className="text-slate-500">
+            <Bell size={20} />
           </Button>
         </div>
       </header>
 
-      <main className="p-4 lg:p-8 space-y-6 lg:space-y-8">
+      <main className="p-4 lg:p-8 space-y-6">
+        {/* MOBILE WELCOME */}
+        <div className="lg:hidden mb-2">
+            <p className="text-[10px] font-bold uppercase tracking-widest text-slate-400">Admin Dashboard</p>
+            <h2 className="text-xl font-black text-slate-900">Hi, {user?.name?.split(' ')[0] || "Manager"}</h2>
+        </div>
 
-        {/* STATS */}
+        {/* STATS GRID */}
         <div className="grid grid-cols-2 gap-3 lg:grid-cols-4 lg:gap-6">
           {statsConfig.map((stat, i) => (
             <Card key={i} className="border-none shadow-sm ring-1 ring-slate-200/50">
-              <CardHeader className="flex flex-row items-center justify-between pb-1 p-3 lg:p-6">
-                <CardTitle className="text-[10px] uppercase tracking-wider font-bold text-slate-400 lg:text-sm">
+              <CardHeader className="flex flex-row items-center justify-between pb-1 p-4">
+                <CardTitle className="text-[9px] uppercase tracking-widest font-bold text-slate-400">
                   {stat.title}
                 </CardTitle>
-                <div className={`${stat.bg} ${stat.color} p-2 rounded-lg`}>
-                  <stat.icon className="h-4 w-4" />
+                <div className={`${stat.bg} ${stat.color} p-1.5 rounded-md`}>
+                  <stat.icon className="h-3.5 w-3.5" />
                 </div>
               </CardHeader>
-              <CardContent className="p-3 pt-0 lg:p-6 lg:pt-0">
+              <CardContent className="p-4 pt-0">
                 {isLoading ? (
-                  <Skeleton className="h-7 w-16 lg:h-9 lg:w-24" />
+                  <Skeleton className="h-6 w-16" />
                 ) : (
-                  <div className="text-lg font-bold lg:text-3xl">
+                  <div className="text-base font-black tracking-tighter">
                     {stat.value}
                   </div>
                 )}
@@ -136,67 +140,56 @@ export default function AdminDashboard() {
         </div>
 
         {/* QUICK MANAGEMENT */}
-        <div className="grid grid-cols-1 gap-6 lg:grid-cols-3">
-          <Card className="lg:col-span-2 border-none shadow-sm ring-1 ring-slate-200/50">
-            <CardHeader className="border-b p-4 lg:p-6">
-              <div className="flex items-center justify-between">
-                <div>
-                  <CardTitle>Quick Management</CardTitle>
-                  <CardDescription className="text-xs">
-                    Direct access to your store tools.
-                  </CardDescription>
-                </div>
-                <Link href="/admin/products/new">
-                  <Button size="sm" className="bg-black text-white">
-                    <Plus className="mr-1 h-4 w-4" />
-                    Add Product
-                  </Button>
-                </Link>
-              </div>
-            </CardHeader>
+        <Card className="border-none shadow-sm ring-1 ring-slate-200/50 overflow-hidden">
+          <CardHeader className="border-b bg-white p-5">
+            <div className="flex items-center justify-between">
+              <CardTitle className="text-base font-bold">Store Controls</CardTitle>
+              <Link href="/admin/products/new">
+                <Button className="bg-black text-white rounded-full h-9 px-4 text-[10px] font-bold uppercase tracking-widest">
+                  <Plus className="mr-1 h-3.5 w-3.5" />
+                  Add
+                </Button>
+              </Link>
+            </div>
+          </CardHeader>
 
-            <CardContent className="p-2 borer">
-              {[
-                { name: "Inventory Management", desc: "Edit prices and stock", href: "/admin/products" },
-                // { name: "Order Tracking", desc: "View and ship orders", href: "/admin/orders" },
-                { name: "Collections", desc: "Manage product categories", href: "/admin/categories" },
-              ].map((item, i) => (
-                <Link
-                  key={i}
-                  href={item.href}
-                  className="flex items-center justify-between p-3 rounded-lg hover:bg-slate-50"
-                >
-                  <div>
-                    <p className="text-sm font-semibold">{item.name}</p>
-                    <p className="text-xs text-slate-400">{item.desc}</p>
+          <CardContent className="p-0">
+            {[
+              { name: "Inventory", desc: "Manage stock & pricing", href: "/admin/products", icon: Package },
+              { name: "Collections", desc: "Manage categories", href: "/admin/categories", icon: Layers },
+            ].map((item, i) => (
+              <Link
+                key={i}
+                href={item.href}
+                className="flex items-center justify-between p-5 border-b last:border-0 active:bg-slate-50 transition-colors"
+              >
+                <div className="flex items-center gap-4">
+                  <div className="p-2.5 bg-slate-100 rounded-xl">
+                     <item.icon size={18} className="text-slate-600" />
                   </div>
-                  <ChevronRight size={16} />
-                </Link>
-              ))}
-            </CardContent>
-          </Card>
-        </div>
+                  <div>
+                    <p className="text-sm font-bold uppercase tracking-tight">{item.name}</p>
+                    <p className="text-[10px] text-slate-400 font-medium">{item.desc}</p>
+                  </div>
+                </div>
+                <ChevronRight size={16} className="text-slate-300" />
+              </Link>
+            ))}
+          </CardContent>
+        </Card>
       </main>
 
-      {/* MOBILE BOTTOM NAV */}
-      <nav className="fixed bottom-0 left-0 right-0 z-50 flex h-16 justify-around border-t bg-white lg:hidden">
-        <Link href="/admin" className="flex flex-col items-center text-black">
-          <LayoutDashboard size={20} />
-          <span className="text-[10px]">Home</span>
-        </Link>
-        <Link href="/admin/products" className="flex flex-col items-center text-slate-400">
-          <Package size={20} />
-          <span className="text-[10px]">Items</span>
-        </Link>
-        <Link href="/admin/orders" className="flex flex-col items-center text-slate-400">
-          <ShoppingCart size={20} />
-          <span className="text-[10px]">Orders</span>
-        </Link>
-        <Link href="/admin/settings" className="flex flex-col items-center text-slate-400">
-          <Users size={20} />
-          <span className="text-[10px]">Users</span>
-        </Link>
-      </nav>
+      {/* --- MOBILE FLOATING HOME BUTTON --- */}
+      <div className="fixed bottom-6 right-6 lg:hidden z-50">
+        <button
+          onClick={() => router.push("/")}
+          className="flex items-center gap-2 bg-black text-white px-5 py-4 rounded-full shadow-[0_20px_40px_rgba(0,0,0,0.3)] active:scale-95 transition-transform animate-in fade-in slide-in-from-bottom-4 duration-500"
+        >
+          <Globe size={18} />
+          <span className="text-[10px] font-bold uppercase tracking-[0.2em]">Exit to Store</span>
+          <ExternalLink size={12} className="opacity-50" />
+        </button>
+      </div>
     </div>
   )
 }

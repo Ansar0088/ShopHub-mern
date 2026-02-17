@@ -6,7 +6,7 @@ import { useRouter } from "next/navigation"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { useAuth } from "@/components/auth-provider"
-import { Trash2, Plus, ArrowLeft } from "lucide-react"
+import { Trash2, Plus, ArrowLeft, LayoutDashboard } from "lucide-react"
 import { Spinner } from "@/components/ui/spinner"
 
 interface Category {
@@ -38,7 +38,7 @@ export default function CategoriesPage() {
       const response = await fetch("/api/categories")
       if (response.ok) {
         const data = await response.json()
-        setCategories(data.data.categories)
+        setCategories(data.data.categories || [])
       }
     } catch (error) {
       console.error("[Fetch Categories Error]", error)
@@ -49,7 +49,6 @@ export default function CategoriesPage() {
 
   const handleCreate = async (e: React.FormEvent) => {
     e.preventDefault()
-
     try {
       const response = await fetch("/api/categories", {
         method: "POST",
@@ -71,13 +70,11 @@ export default function CategoriesPage() {
 
   const handleDelete = async (id: string) => {
     if (!confirm("Are you sure you want to delete this category?")) return
-
     try {
       const response = await fetch(`/api/categories/${id}`, {
         method: "DELETE",
         headers: { Authorization: `Bearer ${token}` },
       })
-
       if (response.ok) fetchCategories()
     } catch (error) {
       console.error("[Delete Category Error]", error)
@@ -85,142 +82,140 @@ export default function CategoriesPage() {
   }
 
   return (
-    <div className="min-h-screen bg-background">
-
+    <div className="min-h-screen bg-[#F9FAFB] pb-10">
       {/* HEADER */}
-      <header className="sticky top-0 z-40 border-b border-border bg-card px-4 py-4 sm:px-6">
-        <div className="flex items-center gap-3">
-
-          {/* BACK BUTTON (MOBILE ONLY) */}
+      <header className="sticky top-0 z-40 flex h-16 items-center justify-between border-b bg-white/80 px-4 backdrop-blur-md lg:h-20 lg:px-8">
+        <div className="flex items-center gap-4">
+          {/* BACK BUTTON (Works on Desktop & Mobile) */}
           <Button
             variant="ghost"
-            size="icon"
-            onClick={() => router.back()}
-            className="lg:hidden"
+            size="sm"
+            onClick={() => router.push("/admin")}
+            className="group flex items-center gap-2 text-slate-500 hover:text-black hover:bg-slate-100 rounded-full px-3"
           >
-            <ArrowLeft className="h-5 w-5" />
+            <ArrowLeft size={18} className="transition-transform group-hover:-translate-x-1" />
+            <span className="hidden sm:inline text-xs font-bold uppercase tracking-widest">Dashboard</span>
           </Button>
 
+          <div className="h-6 w-[1px] bg-slate-200" />
+
           <div>
-            <h1 className="text-2xl sm:text-3xl font-bold text-foreground">
-              Manage Categories
+            <h1 className="text-sm font-black uppercase tracking-tighter text-slate-900 lg:text-xl">
+              Categories<span className="text-slate-400">.</span>
             </h1>
-            <p className="text-sm sm:text-base text-muted-foreground">
-              Create and manage product categories
+            <p className="hidden text-[10px] font-bold uppercase tracking-widest text-slate-400 lg:block">
+              Structure your catalog
             </p>
           </div>
         </div>
+
+        <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-black text-white shadow-lg lg:h-11 lg:w-11">
+          <LayoutDashboard size={20} strokeWidth={2.5} />
+        </div>
       </header>
 
-      <main className="px-4 py-8 sm:px-6 space-y-8">
-
+      <main className="mx-auto max-w-7xl px-4 py-8 sm:px-6 lg:px-8 space-y-8">
         {/* CREATE FORM */}
-        <Card>
+        <Card className="border-none shadow-sm ring-1 ring-slate-200/50">
           <CardHeader>
-            <CardTitle className="text-base sm:text-lg">
+            <CardTitle className="text-base font-bold uppercase tracking-tight">
               Create New Category
             </CardTitle>
           </CardHeader>
-
           <CardContent>
-            <form onSubmit={handleCreate} className="space-y-4">
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                <div>
-                  <label className="block text-sm font-medium mb-2">
+            <form onSubmit={handleCreate} className="space-y-6">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
+                <div className="space-y-2">
+                  <label className="text-[10px] font-bold uppercase tracking-widest text-slate-400">
                     Category Name
                   </label>
                   <input
                     value={formData.name}
-                    onChange={(e) =>
-                      setFormData({ ...formData, name: e.target.value })
-                    }
-                    className="w-full rounded-lg border px-3 py-2 text-sm"
+                    placeholder="e.g., Summer Collection"
+                    onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+                    className="w-full rounded-lg border border-slate-200 bg-slate-50 px-4 py-2.5 text-sm focus:bg-white focus:ring-2 focus:ring-black outline-none transition-all"
                     required
                   />
                 </div>
-
-                <div>
-                  <label className="block text-sm font-medium mb-2">
-                    Slug
+                <div className="space-y-2">
+                  <label className="text-[10px] font-bold uppercase tracking-widest text-slate-400">
+                    Slug (URL Key)
                   </label>
                   <input
                     value={formData.slug}
-                    onChange={(e) =>
-                      setFormData({ ...formData, slug: e.target.value })
-                    }
-                    className="w-full rounded-lg border px-3 py-2 text-sm"
+                    placeholder="e.g., summer-collection"
+                    onChange={(e) => setFormData({ ...formData, slug: e.target.value })}
+                    className="w-full rounded-lg border border-slate-200 bg-slate-50 px-4 py-2.5 text-sm focus:bg-white focus:ring-2 focus:ring-black outline-none transition-all"
                     required
                   />
                 </div>
               </div>
-
-              <div>
-                <label className="block text-sm font-medium mb-2">
+              <div className="space-y-2">
+                <label className="text-[10px] font-bold uppercase tracking-widest text-slate-400">
                   Description
                 </label>
                 <textarea
                   rows={3}
+                  placeholder="Describe the aesthetic of this category..."
                   value={formData.description}
-                  onChange={(e) =>
-                    setFormData({
-                      ...formData,
-                      description: e.target.value,
-                    })
-                  }
-                  className="w-full rounded-lg border px-3 py-2 text-sm"
+                  onChange={(e) => setFormData({ ...formData, description: e.target.value })}
+                  className="w-full rounded-lg border border-slate-200 bg-slate-50 px-4 py-2.5 text-sm focus:bg-white focus:ring-2 focus:ring-black outline-none transition-all resize-none"
                 />
               </div>
-
-              <Button type="submit">
+              <Button type="submit" className="bg-black text-white hover:bg-zinc-800 rounded-full px-8 h-11 text-[10px] font-bold uppercase tracking-widest">
                 <Plus className="h-4 w-4 mr-2" />
-                Create Category
+                Add Category
               </Button>
             </form>
           </CardContent>
         </Card>
 
         {/* CATEGORY LIST */}
-        <Card>
-          <CardHeader>
-            <CardTitle className="text-base sm:text-lg">
-              All Categories
+        <Card className="border-none shadow-sm ring-1 ring-slate-200/50 overflow-hidden">
+          <CardHeader className="bg-white border-b border-slate-100">
+            <CardTitle className="text-base font-bold uppercase tracking-tight">
+              Active Collections
             </CardTitle>
           </CardHeader>
-
-          <CardContent>
+          <CardContent className="p-0">
             {isLoading ? (
-              <Spinner className="size-6 text-blue-500" />
+              <div className="py-20 flex flex-col items-center justify-center gap-3">
+                <Spinner className="size-6 text-black" />
+                <p className="text-[10px] font-bold uppercase tracking-widest text-slate-400 animate-pulse">Syncing Categories</p>
+              </div>
             ) : categories.length === 0 ? (
-              <p className="text-muted-foreground">No categories found</p>
+              <div className="py-20 text-center">
+                <p className="text-sm font-medium text-slate-400">No categories found.</p>
+              </div>
             ) : (
               <div className="overflow-x-auto">
                 <table className="w-full text-sm">
-                  <thead className="border-b">
-                    <tr>
-                      <th className="text-left py-3">Name</th>
-                      <th className="text-left py-3">Slug</th>
-                      <th className="hidden sm:table-cell py-3">
-                        Description
-                      </th>
-                      <th className="py-3">Actions</th>
+                  <thead>
+                    <tr className="bg-slate-50/50 border-b border-slate-100">
+                      <th className="text-left px-6 py-4 text-[10px] font-bold uppercase tracking-widest text-slate-400">Name</th>
+                      <th className="text-left px-6 py-4 text-[10px] font-bold uppercase tracking-widest text-slate-400">Slug</th>
+                      <th className="hidden sm:table-cell px-6 py-4 text-[10px] font-bold uppercase tracking-widest text-slate-400">Description</th>
+                      <th className="text-right px-6 py-4 text-[10px] font-bold uppercase tracking-widest text-slate-400">Actions</th>
                     </tr>
                   </thead>
-                  <tbody>
+                  <tbody className="divide-y divide-slate-50">
                     {categories.map((cat) => (
-                      <tr key={cat._id} className="border-b">
-                        <td className="py-3">{cat.name}</td>
-                        <td className="py-3 text-muted-foreground">
-                          {cat.slug}
+                      <tr key={cat._id} className="hover:bg-slate-50/50 transition-colors">
+                        <td className="px-6 py-4 font-bold text-slate-900">{cat.name}</td>
+                        <td className="px-6 py-4">
+                          <code className="bg-slate-100 px-2 py-1 rounded text-[11px] text-slate-600 uppercase font-bold tracking-tight">
+                            {cat.slug}
+                          </code>
                         </td>
-                        <td className="hidden sm:table-cell py-3">
-                          {cat.description || "-"}
+                        <td className="hidden sm:table-cell px-6 py-4 text-slate-400 italic font-medium">
+                          {cat.description || "No description provided"}
                         </td>
-                        <td className="py-3">
+                        <td className="px-6 py-4 text-right">
                           <Button
                             variant="ghost"
                             size="icon"
                             onClick={() => handleDelete(cat._id)}
-                            className="text-destructive"
+                            className="text-slate-300 hover:text-red-500 hover:bg-red-50"
                           >
                             <Trash2 className="h-4 w-4" />
                           </Button>

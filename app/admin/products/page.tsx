@@ -35,8 +35,10 @@ interface Product {
   price: number
   stock: number
   category: string
-  images: string[] // Changed from image?: string to match your DB
+  images: string[]
 }
+
+const PAGE_SIZE = 5
 
 export default function ProductsPage() {
   const router = useRouter()
@@ -53,19 +55,22 @@ export default function ProductsPage() {
   const [selectedFile, setSelectedFile] = useState<File | null>(null)
   const [previewUrl, setPreviewUrl] = useState<string | null>(null)
 
+  const [currentPage, setCurrentPage] = useState(1)
+
   useEffect(() => {
     fetchProducts()
   }, [token])
 
   const fetchProducts = async () => {
     try {
-      const response = await fetch("/api/products")
-      if (response.ok) {
-        const data = await response.json()
-        setProducts(data.data.products)
-      }
-    } catch (error) {
-      console.error("[Fetch Error]", error)
+      setIsLoading(true)
+      const res = await fetch("/api/products")
+      if (!res.ok) throw new Error("Failed to fetch products")
+      const data = await res.json()
+      // Defensive check for product list
+      setProducts(data?.data?.products || [])
+    } catch (err) {
+      console.error("[Fetch Products]", err)
     } finally {
       setIsLoading(false)
     }
@@ -73,7 +78,6 @@ export default function ProductsPage() {
 
   const openEditModal = (product: Product) => {
     setEditingProduct({ ...product })
-    // Look for the first image in the array for the preview
     setPreviewUrl(product.images?.[0] || null)
     setSelectedFile(null)
     setIsModalOpen(true)
@@ -81,34 +85,28 @@ export default function ProductsPage() {
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0]
-    if (file) {
-      if (file.size > 2 * 1024 * 1024) {
-        alert("File too large. Please select an image under 2MB.")
-        return
-      }
-      setSelectedFile(file)
-      const reader = new FileReader()
-      reader.onloadend = () => {
-        setPreviewUrl(reader.result as string)
-      }
-      reader.readAsDataURL(file)
+    if (!file) return
+    if (file.size > 2 * 1024 * 1024) {
+      alert("File too large (max 2MB)")
+      return
     }
+    setSelectedFile(file)
+    const reader = new FileReader()
+    reader.onloadend = () => setPreviewUrl(reader.result as string)
+    reader.readAsDataURL(file)
   }
 
   const handleUpdate = async () => {
     if (!editingProduct) return
     setIsUpdating(true)
-
     try {
-      // Use the existing first image if no new file is selected
       let finalImage = editingProduct.images?.[0] || ""
-
       if (selectedFile) {
-        finalImage = await new Promise((resolve, reject) => {
+        finalImage = await new Promise<string>((resolve, reject) => {
           const reader = new FileReader()
           reader.readAsDataURL(selectedFile)
           reader.onload = () => resolve(reader.result as string)
-          reader.onerror = (error) => reject(error)
+          reader.onerror = (err) => reject(err)
         })
       }
 
@@ -118,29 +116,36 @@ export default function ProductsPage() {
         price: Number(editingProduct.price),
         stock: Number(editingProduct.stock),
         category: editingProduct.category,
-        image: finalImage, // Sending the single string, backend puts it in the array
+        image: finalImage,
       }
 
-      const response = await fetch(`/api/products/${editingProduct._id}`, {
+      const res = await fetch(`/api/products/${editingProduct._id}`, {
         method: "PUT",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${token}`,
-        },
+        headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
         body: JSON.stringify(payload),
       })
+      const result = await res.json()
 
-      const result = await response.json()
-
-      if (response.ok && result.success) {
-        const updatedDoc = result.data.product
-        setProducts((prev) =>
-          prev.map((p) => (p._id === editingProduct._id ? updatedDoc : p))
-        )
-        setIsModalOpen(false)
+      if (!res.ok || !result.success) {
+        alert(result.message || "Failed to update product")
+        return
       }
-    } catch (error) {
-      console.error("[Update Error]", error)
+
+      // FIX: Check multiple possible data paths to avoid 'undefined'
+      const updatedItem = result.data?.product || result.data;
+
+      if (!updatedItem) {
+        throw new Error("Update successful but no data returned")
+      }
+
+      setProducts((prev) =>
+        prev.map((p) => (p._id === editingProduct._id ? updatedItem : p))
+      )
+      setIsModalOpen(false)
+       
+    } catch (err) {
+      console.error("[Update Product]", err)
+      alert("Something went wrong during update.")
     } finally {
       setIsUpdating(false)
     }
@@ -149,33 +154,44 @@ export default function ProductsPage() {
   const deleteProduct = async (id: string) => {
     if (!confirm("Delete this product?")) return
     try {
-      const response = await fetch(`/api/products/${id}`, {
+      const res = await fetch(`/api/products/${id}`, {
         method: "DELETE",
         headers: { Authorization: `Bearer ${token}` },
       })
-      if (response.ok) {
-        setProducts((prev) => prev.filter((p) => p._id !== id))
+      const result = await res.json()
+      if (!res.ok || !result.success) {
+        alert(result.message || "Failed to delete product")
+        return
       }
-    } catch (error) {
-      console.error("[Delete Error]", error)
+      setProducts((prev) => prev.filter((p) => p && p._id !== id))
+    } catch (err) {
+      console.error("[Delete Product]", err)
     }
   }
 
-  const filteredProducts = products.filter((p) =>
-    p.name.toLowerCase().includes(searchQuery.toLowerCase())
+  // --- SAFE CALCULATIONS (Prevents Crashing) ---
+  
+  const filteredProducts = products.filter(p =>
+    p && p.name && p.name.toLowerCase().includes(searchQuery.toLowerCase())
   )
+
+  const totalPages = Math.ceil(filteredProducts.length / PAGE_SIZE) || 1
+  
+  const paginatedProducts = filteredProducts.slice(
+    (currentPage - 1) * PAGE_SIZE,
+    currentPage * PAGE_SIZE
+  )
+
+  const changePage = (page: number) => {
+    if (page < 1 || page > totalPages) return
+    setCurrentPage(page)
+  }
 
   return (
     <div className="min-h-screen bg-slate-50/50 p-4 md:p-8">
       <div className="mx-auto max-w-7xl space-y-6">
-        <Button
-          variant="ghost"
-          size="sm"
-          onClick={() => router.back()}
-          className="text-slate-500 hover:text-black"
-        >
-          <ArrowLeft className="mr-2 h-4 w-4" />
-          Back
+        <Button variant="ghost" size="sm" onClick={() => router.back()} className="text-slate-500 hover:text-black">
+          <ArrowLeft className="mr-2 h-4 w-4" /> Back
         </Button>
 
         <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
@@ -183,18 +199,21 @@ export default function ProductsPage() {
             <h1 className="text-2xl md:text-3xl font-bold tracking-tight">Inventory</h1>
             <p className="text-muted-foreground text-sm">Manage products and stock levels.</p>
           </div>
+          <div className="text-sm text-slate-500">Total Products: {products.length}</div>
         </div>
 
+        {/* STAT CARDS - Now with defensive filtering */}
         <div className="grid gap-4 grid-cols-1 sm:grid-cols-2">
-          <StatCard title="Total Items" value={products.length} icon={<Package className="h-4 w-4" />} />
+          <StatCard title="Total Items" value={products.filter(Boolean).length} icon={<Package className="h-4 w-4" />} />
           <StatCard
             title="Low Stock"
-            value={products.filter(p => p.stock < 10).length}
+            value={products.filter(p => p && typeof p.stock === 'number' && p.stock < 10).length}
             icon={<AlertCircle className="h-4 w-4 text-orange-500" />}
             color="text-orange-600"
           />
         </div>
 
+        {/* SEARCH + TABLE */}
         <Card className="border-none shadow-sm overflow-hidden">
           <div className="p-4 border-b bg-white flex flex-col sm:flex-row gap-4">
             <div className="relative flex-1">
@@ -203,7 +222,7 @@ export default function ProductsPage() {
                 placeholder="Search inventory..."
                 className="pl-10"
                 value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
+                onChange={(e) => { setSearchQuery(e.target.value); setCurrentPage(1) }}
               />
             </div>
           </div>
@@ -214,6 +233,8 @@ export default function ProductsPage() {
                 <Spinner className="h-6 w-6" />
                 <p className="text-sm text-muted-foreground">Syncing catalog...</p>
               </div>
+            ) : paginatedProducts.length === 0 ? (
+              <div className="py-20 text-center text-sm text-gray-400">No products found.</div>
             ) : (
               <div className="overflow-x-auto">
                 <table className="w-full text-sm">
@@ -227,12 +248,11 @@ export default function ProductsPage() {
                     </tr>
                   </thead>
                   <tbody className="divide-y bg-white">
-                    {filteredProducts.map((product) => (
+                    {paginatedProducts.map(product => (
                       <tr key={product._id} className="hover:bg-slate-50/50">
                         <td className="px-6 py-4">
                           <div className="flex items-center gap-3">
                             <div className="h-10 w-10 shrink-0 rounded bg-slate-100 border overflow-hidden">
-                              {/* UPDATE: Access images[0] */}
                               {product.images?.[0] ? (
                                 <img src={product.images[0]} className="h-full w-full object-cover" alt="" />
                               ) : (
@@ -242,13 +262,15 @@ export default function ProductsPage() {
                             <div className="font-medium truncate max-w-[200px]">{product.name}</div>
                           </div>
                         </td>
-                        <td className="px-6 py-4 hidden md:table-cell"><Badge variant="secondary">{product.category}</Badge></td>
+                        <td className="px-6 py-4 hidden md:table-cell">
+                          <Badge variant="secondary">{product.category}</Badge>
+                        </td>
                         <td className="px-6 py-4 font-medium">${product.price}</td>
                         <td className="px-6 py-4">{product.stock}</td>
                         <td className="px-6 py-4 text-right">
                           <div className="flex justify-end gap-1">
-                            <Button variant="ghost" size="icon" onClick={() => openEditModal(product)}><Edit3 className="h-4 w-4" /></Button>
-                            <Button variant="ghost" size="icon" className="text-red-500" onClick={() => deleteProduct(product._id)}><Trash2 className="h-4 w-4" /></Button>
+                            <Button variant="ghost" size="icon" onClick={() => openEditModal(product)} disabled={isUpdating}><Edit3 className="h-4 w-4" /></Button>
+                            <Button variant="ghost" size="icon" className="text-red-500" onClick={() => deleteProduct(product._id)} disabled={isUpdating}><Trash2 className="h-4 w-4" /></Button>
                           </div>
                         </td>
                       </tr>
@@ -258,9 +280,17 @@ export default function ProductsPage() {
               </div>
             )}
           </CardContent>
+
+          {/* PAGINATION */}
+          <div className="flex justify-end gap-2 px-4 py-2 bg-slate-50 border-t">
+            <Button size="sm" onClick={() => changePage(currentPage - 1)} disabled={currentPage === 1}>Prev</Button>
+            <span className="flex items-center px-2 font-bold text-xs">{currentPage} / {totalPages}</span>
+            <Button size="sm" onClick={() => changePage(currentPage + 1)} disabled={currentPage === totalPages}>Next</Button>
+          </div>
         </Card>
       </div>
 
+      {/* EDIT MODAL */}
       <Dialog open={isModalOpen} onOpenChange={setIsModalOpen}>
         <DialogContent className="max-w-[95vw] sm:max-w-[600px] p-0 overflow-hidden">
           <DialogHeader className="p-6 pb-0"><DialogTitle>Edit Product</DialogTitle></DialogHeader>
@@ -314,7 +344,7 @@ export default function ProductsPage() {
           <DialogFooter className="bg-slate-50 p-4 border-t">
             <Button variant="ghost" onClick={() => setIsModalOpen(false)}>Cancel</Button>
             <Button onClick={handleUpdate} disabled={isUpdating} className="bg-black text-white px-8">
-              {isUpdating ? <Spinner className="h-4 w-4 mr-2" /> : "Save Changes"}
+              {isUpdating ? <Spinner className="h-4 w-4 mr-2 text-white" /> : "Save Changes"}
             </Button>
           </DialogFooter>
         </DialogContent>

@@ -24,12 +24,18 @@ interface Category {
 export function ShopContent() {
   const router = useRouter()
   const searchParams = useSearchParams()
-  const categoryParam = searchParams.get("category")
+
+  const categoryParam = searchParams.get("category") || ""
+  const pageParam = Number(searchParams.get("page")) || 1
 
   const [products, setProducts] = useState<Product[]>([])
   const [categories, setCategories] = useState<Category[]>([])
-  const [selectedCategory, setSelectedCategory] = useState(categoryParam || "")
+  const [selectedCategory, setSelectedCategory] = useState(categoryParam)
+  const [page, setPage] = useState(pageParam)
+  const [totalPages, setTotalPages] = useState(1)
   const [isLoading, setIsLoading] = useState(true)
+
+  const LIMIT = 8
 
   useEffect(() => {
     fetchCategories()
@@ -37,177 +43,199 @@ export function ShopContent() {
 
   useEffect(() => {
     fetchProducts()
-  }, [selectedCategory])
+  }, [selectedCategory, page])
+
+  useEffect(() => {
+    const params = new URLSearchParams()
+    if (selectedCategory) params.set("category", selectedCategory)
+    if (page > 1) params.set("page", page.toString())
+    router.push(`/shop?${params.toString()}`)
+  }, [selectedCategory, page])
 
   const fetchCategories = async () => {
     try {
-      const response = await fetch("/api/categories")
-      if (response.ok) {
-        const data = await response.json()
-        setCategories(data.data?.categories || [])
-      }
-    } catch (error) {
-      console.error("[Fetch Categories Error]", error)
+      const res = await fetch("/api/categories")
+      const data = await res.json()
+      setCategories(data.data?.categories || [])
+    } catch (e) {
+      console.error(e)
     }
   }
 
   const fetchProducts = async () => {
     setIsLoading(true)
     try {
-      const query = selectedCategory ? `?category=${selectedCategory}` : ""
-      const response = await fetch(`/api/products${query}`)
-      if (response.ok) {
-        const data = await response.json()
-        setProducts(data.data.products)
-      }
-    } catch (error) {
-      console.error("[Fetch Products Error]", error)
+      const params = new URLSearchParams()
+      params.set("limit", LIMIT.toString())
+      params.set("page", page.toString())
+      if (selectedCategory) params.set("category", selectedCategory)
+
+      const res = await fetch(`/api/products?${params.toString()}`)
+      const data = await res.json()
+
+      setProducts(data.data.products)
+      setTotalPages(data.data.pagination.totalPages)
+    } catch (e) {
+      console.error(e)
     } finally {
       setIsLoading(false)
     }
   }
 
   return (
-    <main className="min-h-screen bg-white text-black selection:bg-black selection:text-white">
-      {/* MINIMAL STICKY HEADER */}
-      <nav className="sticky top-0 z-50 w-full bg-white/90 backdrop-blur-xl border-b border-gray-100">
-        <div className="mx-auto max-w-[1600px] px-6 h-20 flex items-center justify-between">
-          <button 
-            onClick={() => router.push("/")}
-            className="flex items-center gap-2 group text-xs font-bold uppercase tracking-widest"
-          >
-            <ArrowLeft size={16} className="group-hover:-translate-x-1 transition-transform" />
-            <span className="hidden sm:inline">Back</span>
+    <main className="min-h-screen bg-white text-black">
+
+      {/* HEADER */}
+      <nav className="sticky top-0 z-50 bg-white/90 backdrop-blur-xl border-b">
+        <div className="max-w-[1600px] mx-auto px-6 h-20 flex justify-between items-center">
+          <button onClick={() => router.push("/")} className="flex items-center gap-2 text-xs font-bold uppercase tracking-widest">
+            <ArrowLeft size={16} /> Back
           </button>
-          
-          {/* CATEGORY NAV: Scrollable on mobile */}
-          <div className="flex items-center gap-6 overflow-x-auto no-scrollbar px-4 md:px-0 uppercase text-[10px] font-bold tracking-[0.3em]">
-            <button 
-              onClick={() => setSelectedCategory("")}
-              className={`whitespace-nowrap hover:text-gray-400 transition-colors ${selectedCategory === "" ? "underline underline-offset-8 decoration-2" : ""}`}
+
+          <div className="flex gap-6 overflow-x-auto text-[10px] font-bold tracking-[0.3em] uppercase">
+            <button
+              onClick={() => { setSelectedCategory(""); setPage(1) }}
+              className={!selectedCategory ? "underline underline-offset-8" : ""}
             >
               All
             </button>
-            {categories.map((cat) => (
-              <button 
+            {categories.map(cat => (
+              <button
                 key={cat._id}
-                onClick={() => setSelectedCategory(cat.slug)}
-                className={`whitespace-nowrap hover:text-gray-400 transition-colors ${selectedCategory === cat.slug ? "underline underline-offset-8 decoration-2" : ""}`}
+                onClick={() => { setSelectedCategory(cat.slug); setPage(1) }}
+                className={selectedCategory === cat.slug ? "underline underline-offset-8" : ""}
               >
                 {cat.name}
               </button>
             ))}
           </div>
 
-          <div className="flex items-center gap-5">
-             <ShoppingBag size={20} strokeWidth={1.5} />
-          </div>
+          <ShoppingBag size={20} />
         </div>
       </nav>
 
-      {/* HERO SECTION */}
-      <section className="px-6 pt-16 pb-12">
-        <div className="mx-auto max-w-[1600px]">
-          <div className="flex flex-col md:flex-row md:items-end justify-between gap-6">
-            <div>
-              <p className="text-[10px] font-bold uppercase tracking-[0.5em] text-gray-400 mb-4">Collection 2026</p>
-              <h1 className="text-6xl md:text-8xl font-medium tracking-tighter leading-[0.85]">
-                {selectedCategory ? categories.find(c => c.slug === selectedCategory)?.name : "Essentials"}<span className="text-gray-300">.</span>
-              </h1>
-            </div>
-
-            {/* DISABLED SORT & FILTER WITH TOOLTIP */}
-            <div className="relative group cursor-not-allowed border-b border-gray-200 pb-2 mb-2 opacity-50">
-               <div className="flex items-center gap-4">
-                  <SlidersHorizontal size={14} />
-                  <span className="text-xs font-bold uppercase tracking-widest">Sort & Filter</span>
-               </div>
-               {/* Tooltip */}
-               <span className="absolute -top-8 right-0 bg-black text-white text-[8px] px-2 py-1 rounded opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap tracking-widest uppercase">
-                  Feature Coming Soon
-               </span>
-            </div>
-          </div>
-        </div>
-      </section>
-
-      {/* MAIN GRID */}
+      {/* GRID */}
       <section className="px-6 py-12">
-        <div className="mx-auto max-w-[1600px]">
+        <div className="max-w-[1600px] mx-auto">
+
           {isLoading ? (
-            <div className="flex flex-col items-center justify-center py-40 gap-4">
-              <Spinner className="w-8 h-8 text-black" />
-              <p className="text-[10px] font-bold uppercase tracking-widest text-gray-400 animate-pulse">Loading Catalog</p>
-            </div>
-          ) : products.length === 0 ? (
-            <div className="flex flex-col items-center justify-center py-40 border border-dashed border-gray-200">
-               <h2 className="text-2xl font-light italic">No pieces found in this category.</h2>
-               <Button variant="link" onClick={() => setSelectedCategory("")} className="mt-4 uppercase text-xs tracking-widest font-bold">View all items</Button>
+            <div className="flex justify-center py-40">
+              <Spinner />
             </div>
           ) : (
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-x-4 gap-y-16">
-              {products.map((product) => (
-                <div key={product._id} className="group cursor-pointer">
-                  {/* PREMIUM CARD IMAGE */}
-                  <div className="relative aspect-[3/4] bg-[#F7F7F7] overflow-hidden">
-                    <img
-                      src={product.images[0]}
-                      alt={product.name}
-                      className="w-full h-full object-cover transition-transform duration-[1.5s] ease-out group-hover:scale-110"
-                    />
-                    
-                    <div className="absolute top-4 left-4">
-                       <span className="bg-white px-3 py-1 text-[9px] font-black uppercase tracking-tighter shadow-sm">New Arrival</span>
-                    </div>
+            <>
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-x-4 gap-y-16">
+                {products.map((product) => (
+  <div
+    key={product._id}
+    className="group cursor-pointer flex flex-col"
+  >
+    {/* IMAGE CONTAINER */}
+    <div className="relative aspect-[3/4] bg-[#F5F5F5] overflow-hidden">
 
-                    <button className="absolute bottom-0 left-0 w-full bg-black text-white py-5 flex items-center justify-center gap-2 translate-y-full group-hover:translate-y-0 transition-all duration-500 ease-in-out opacity-0 group-hover:opacity-100">
-                      <Plus size={16} />
-                      <span className="text-[10px] font-bold uppercase tracking-[0.2em]">Add to Bag</span>
-                    </button>
-                  </div>
+      {/* IMAGE */}
+      <img
+        src={product.images[0]}
+        alt={product.name}
+        className="w-full h-full object-cover transition-transform duration-[1200ms] ease-out group-hover:scale-110"
+      />
 
-                  {/* PRODUCT DETAILS */}
-                  <div className="mt-6 flex flex-col gap-1 px-1">
-                    <div className="flex items-center justify-between">
-                      <h3 className="text-[13px] font-bold uppercase tracking-wider text-gray-900 line-clamp-1">
-                        {product.name}
-                      </h3>
-                      <div className="flex items-center gap-1">
-                        <Star size={10} className="fill-black" />
-                        <span className="text-[10px] font-bold">{product.rating}</span>
-                      </div>
-                    </div>
-                    
-                    <p className="text-[12px] text-gray-400 font-medium line-clamp-1 italic">
-                      {product.description}
-                    </p>
-                    
-                    <p className="text-[15px] font-black mt-2">
-                      PKR {product.price.toLocaleString()}
-                    </p>
-                  </div>
-                </div>
-              ))}
-            </div>
+      {/* SOFT GRADIENT OVERLAY */}
+      <div className="absolute inset-0 bg-gradient-to-t from-black/10 via-transparent to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-500" />
+
+      {/* TOP BADGE */}
+      <div className="absolute top-4 left-4">
+        <span className="bg-white/90 backdrop-blur px-3 py-1 text-[9px] font-black uppercase tracking-widest shadow-sm">
+          New
+        </span>
+      </div>
+
+      {/* QUICK VIEW BUTTON */}
+      <button
+        className="absolute top-4 right-4 bg-white/90 backdrop-blur p-2 rounded-full opacity-0 group-hover:opacity-100 transition-all duration-300 shadow-sm hover:scale-105"
+      >
+        <ShoppingBag size={14} />
+      </button>
+
+      {/* ADD TO BAG */}
+      <button
+        className="absolute bottom-0 left-0 w-full bg-black text-white py-4 
+        flex items-center justify-center gap-2 
+        translate-y-full group-hover:translate-y-0 
+        transition-all duration-500 ease-in-out"
+      >
+        <Plus size={14} />
+        <span className="text-[10px] font-bold uppercase tracking-[0.25em]">
+          Add to Bag
+        </span>
+      </button>
+    </div>
+
+    {/* PRODUCT DETAILS */}
+    <div className="mt-5 flex flex-col gap-1 px-1">
+
+      {/* NAME + RATING */}
+      <div className="flex items-center justify-between">
+        <h3 className="text-[13px] font-semibold uppercase tracking-wider text-gray-900 line-clamp-1">
+          {product.name}
+        </h3>
+
+        <div className="flex items-center gap-1">
+          <Star size={11} className="fill-black" />
+          <span className="text-[10px] font-semibold">
+            {product.rating?.toFixed(1) || "4.8"}
+          </span>
+        </div>
+      </div>
+
+      {/* DESCRIPTION */}
+      <p className="text-[12px] text-gray-400 font-medium line-clamp-1 italic">
+        {product.description}
+      </p>
+
+      {/* PRICE */}
+      <div className="mt-2 flex items-center justify-between">
+        <p className="text-[15px] font-black tracking-tight">
+          PKR {product.price.toLocaleString()}
+        </p>
+
+        {/* OPTIONAL STOCK BADGE */}
+        <span className="text-[9px] uppercase tracking-widest text-gray-400">
+          In Stock
+        </span>
+      </div>
+    </div>
+  </div>
+))}
+
+              </div>
+
+              {/* PAGINATION */}
+              <div className="flex justify-center items-center gap-6 mt-20 text-xs font-bold uppercase tracking-widest">
+                <Button
+                  variant="ghost"
+                  disabled={page === 1}
+                  onClick={() => setPage(p => p - 1)}
+                >
+                  Prev
+                </Button>
+
+                <span className="opacity-50">
+                  Page {page} of {totalPages}
+                </span>
+
+                <Button
+                  variant="ghost"
+                  disabled={page === totalPages}
+                  onClick={() => setPage(p => p + 1)}
+                >
+                  Next
+                </Button>
+              </div>
+            </>
           )}
         </div>
       </section>
-
-      {/* LUXURY NEWSLETTER */}
-      <footer className="bg-black text-white py-24 px-6 mt-20">
-        <div className="mx-auto max-w-xl text-center">
-           <h2 className="text-4xl font-medium tracking-tight mb-4">Join the Inner Circle</h2>
-           <p className="text-gray-400 text-sm mb-10 font-light">Be the first to receive access to new releases and exclusive events.</p>
-           <div className="flex border-b border-gray-800 pb-2 focus-within:border-white transition-colors">
-              <input 
-                type="email" 
-                placeholder="EMAIL ADDRESS" 
-                className="bg-transparent flex-1 outline-none text-[10px] font-bold tracking-widest placeholder:text-gray-600 uppercase" 
-              />
-              <button className="text-[10px] font-bold tracking-widest hover:text-gray-400 transition-colors">SIGN UP</button>
-           </div>
-        </div>
-      </footer>
     </main>
   )
 }
